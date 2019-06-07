@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Padrões de consumo de música no lastfm
 
 Dados coletados por Andryw Marques para fazer [esse estudo](http://www.ppgia.pucpr.br/ismir2013/wp-content/uploads/2013/09/257_Paper.pdf). Detalhes sobre a coleta no artigo.
@@ -18,3 +19,6 @@ As principais variáveis são:
   * news           <dbl> Quantos artistas novos foram escutados durante os 6 meses
   * old            <dbl> Quantos artistas já conhecidos foram escutados durante os 6 meses
 ```
+=======
+# car-price-prediction
+>>>>>>> fce2a2c96b1283e03f4392a56211abd9c0d69204
