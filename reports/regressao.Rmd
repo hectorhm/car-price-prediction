@@ -1,0 +1,74 @@
+---
+title: "Regressao"
+author: "Helder Machado - Hector Medeiros - Wesley Anibal"
+output:
+  html_notebook:
+    fig_width: 7
+    theme: readable
+    toc: yes
+    toc_float: yes
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: yes
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(boot)
+library(broom)
+options(scipen = 999)
+set.seed(12345)
+knitr::opts_chunk$set(echo = TRUE)
+theme_set(theme_bw())
+```
+
+```{r}
+dados_carros = read.csv2(here::here("data/true_car_listings.csv"),sep=",", header=T)
+dados_carros = dados_carros[,!(names(dados_carros) %in% c("State","City","Vin","Make"))]
+novos_carros = dados_carros %>% drop_na()
+# novos_carros
+novos_carros = novos_carros%>% distinct()
+novos_carros
+```
+
+```{r}
+fit2006 <- lm(Price ~ Year, data=dados_carros)
+# summary(fit2006)
+```
+
+```{r}
+dados_carros_vw = read.csv2(here::here("data/vw.csv"),sep=",", header=T)
+df = dados_carros_vw[,!(names(dados_carros_vw) %in% c("State","City","Vin","Make"))]
+df = df %>% mutate(idade = 2018 - Year, 
+                   milhagem = (Mileage* 1.60934 ) /1000 )
+fit2 <- lm(Price ~ milhagem + idade, data=df)
+
+tidy(fit2, conf.int = TRUE)
+glance(fit2)
+```
+
+
+```{r}
+fit3 <- lm(Price ~ Year, data=df)
+summary(fit3)
+tidy(fit3)
+```
+#### extra
+
+```{r}
+# x = lm(cars$dist ~ cars$speed)
+# plot(cars)
+# abline(x$coefficients, col="red")
+
+```
+
+```{r}
+ggplot(fit2, aes(x = predict(fit2), y = residuals(fit2))) + geom_point() + geom_smooth(method = "lm")
+```
+
+```{r}
+ggplot(fit3, aes(x = predict(fit3), y = residuals(fit3))) + geom_point() + geom_smooth(method = "lm")
+```
+
+

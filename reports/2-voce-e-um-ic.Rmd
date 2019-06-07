@@ -1,45 +1,170 @@
 ---
-title: "Implementando ICs"
-author: "Nazareno"
+title: "Inferência musical - LastFM"
+author: "Helder Machado de Lima"
 output:
-  html_document:
-    theme: readable
-    df_print: paged
-    toc: yes
   html_notebook:
     fig_width: 7
     theme: readable
     toc: yes
     toc_float: yes
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: yes
 ---
 
 ```{r setup, include=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(boot)
 theme_set(theme_bw())
-```
-
-## Os dados
-
-```{r}
-set.seed(12345)
-
-lastfm = read_csv(here::here("data/experimento-lastfm.csv"), 
-                  col_types = cols(.default = col_double(), 
-                                   user = col_character()))
-
-lastfm = lastfm %>% 
-  sample_n(300) %>% 
-  select(news, old, mediana_pop)
-
-glimpse(lastfm)
 ```
 
 ## Proporção de artistas novos e popularidade
 
 Utilizaremos ICs para estimar duas métricas sobre os usuários do LastFM em geral durante um período de 6 meses. Em ambos os casos faremos isso a partir de uma amostra de 300 usuários. As duas métricas são: 
 
-1. Qual a proporção de novos artistas em geral escutada por usuários?
-2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
+### 1. Qual a proporção de novos artistas em geral escutada por usuários?
 
-Crie intervalos com 95% de confiança.
+```{r}
+set.seed(12345)
+#https://github.com/cienciadedados-ufcg/inferencia-lastfm
+
+last_fm = read_csv(here::here("data/experimento-lastfm.csv"), 
+                  col_types = cols(.default = col_double(), 
+                                   user = col_character()))
+
+lastfm = last_fm %>% sample_n(300) %>% select(news, old, mediana_pop)
+
+comp_theta = function(df) { df %>% pull(news_prop) %>% mean() }
+
+lastfm <- lastfm  %>% mutate(news_prop = (news / (news + old)))
+
+theta_new = comp_theta(lastfm)
+lastfm <- lastfm %>% sample_n(300) %>% select(news, old, mediana_pop, news_prop)
+
+# glimpse(lastfm)
+
+um_bootstrap <- function(x){
+    reamostra = x %>% sample_n(size = NROW(x), replace = TRUE)
+    new_props = reamostra %>% mutate(news_prop = (news / (news + old))) %>% pull(news_prop)
+    return(mean(new_props))
+}
+
+# um_bootstrap(lastfm)
+
+
+um_bootstrap <- function(x){
+  boot_1 <- sample_n(x, size = NROW(x), replace = TRUE)
+  theta_c_1 = comp_theta(boot_1)
+  
+  return(theta_c_1)
+}
+reamostragens = tibble(i = 1:2500) %>% 
+  mutate(theta_c_1 = map_dbl(i, ~ um_bootstrap(lastfm)))
+
+# reamostragens
+
+reamostragens %>%
+  ggplot(aes(x = theta_c_1)) +
+  geom_histogram(colour = "darkorange", fill = "white")
+reamostragens %>%
+  ggplot(aes(x = theta_c_1 - theta_new)) +
+  geom_histogram(colour = "darkblue", fill = "white")
+
+```
+
+### Calculando os IC
+
+```{r}
+intervalo = reamostragens %>% 
+  mutate(erro = theta_c_1 - theta_new) %>% 
+  summarise(erro_i = quantile(erro, .05), valor_i = theta_new + erro_i,  
+            erro_s = quantile(erro, .95), valor_s = theta_new + erro_s)
+# intervalo
+
+theta_interval = function(df, i) { df %>% slice(i) %>% pull(news_prop) %>% mean() }
+
+booted <- boot(data = lastfm, statistic = theta_interval, R = 2500)
+interval_boot <- boot.ci(booted, conf=.95, type="bca")
+# interval_boot$t0
+# interval_boot$bca[4]
+# interval_boot$bca[5]
+
+ggplot() +
+  geom_rect(data = intervalo, aes(xmin = interval_boot$bca[4], xmax = interval_boot$bca[5]), ymin = -Inf, ymax = Inf, fill = "red", alpha = .25) +
+  geom_rect(data = intervalo, aes(xmin = valor_i, xmax = valor_s), ymin = -Inf, ymax = Inf, fill = "blue", alpha = .25) +
+  geom_histogram(data = reamostragens, aes(theta_c_1), binwidth = .002, fill = "white", colour = "darkgrey") +
+    geom_vline(xintercept = theta_new, color = "darkgreen", size = .5) +
+  labs(title = expression("Intervalos estimados via: bootstrap manual (roxo) +  boot lib (vermelho)"))
+
+
+```
+
+### Avaliação dos resultados:
+
+Para a primeira pergunta, conseguimos verificar que o intervalo de confiança calculado manualmente **[0.237;0.259]**(roxo) é bem próximo do calculado usando a biblioteca boot **[0.235;0.262]**(vermelho). Também podemos perceber que algo próximo a 25% escutam novos artitas, que está dentro dos intervalos que nós encontramos. A linha verde mostra o valor da média encontrada **0.248**.
+
+
+### 2. Para os usuários que gostam de música muito pop (mediana_pop > 5), qual a correlação entre a popularidade mediana dos artistas escutado e a proporção dos artistas escutados que eram novos. 
+
+```{r}
+set.seed(1245)
+comp_theta_cor = function(df) { df %>% filter(mediana_pop > 5) %>% summarise(corr_news_med = cor(news_prop, mediana_pop)) %>% pull(corr_news_med) }
+
+
+theta_new_corr = comp_theta_cor(lastfm)
+
+um_bootstrap <- function(x){
+    reamostra = x %>% sample_n(size = NROW(x), replace = TRUE)
+    corr_news_med = reamostra %>% mutate(corr_news_med = cor(news_prop, mediana_pop)) %>% pull(corr_news_med)
+    return(mean(corr_news_med))
+}
+
+# um_bootstrap(lastfm)
+
+set.seed(1245)
+
+reamostragens_2 = tibble(i = 1:2500) %>% 
+  mutate(theta_c_s_2 = map_dbl(i, ~ um_bootstrap(lastfm)))
+
+# reamostragens
+
+reamostragens_2 %>%
+  ggplot(aes(x = theta_c_s_2)) +
+  geom_histogram(colour = "darkorange", fill = "white")
+reamostragens_2 %>%
+  ggplot(aes(x = theta_c_s_2 - theta_new_corr)) +
+  geom_histogram(colour = "darkblue", fill = "white")
+
+```
+
+### Calculando os IC
+
+```{r}
+set.seed(1245)
+intervalo_2 = reamostragens_2 %>% 
+  mutate(erro = theta_c_s_2 - theta_new_corr) %>% 
+  summarise(erro_i = quantile(erro, .05), valor_i_2 = theta_new_corr + erro_i,  
+            erro_s = quantile(erro, .95), valor_s_2 = theta_new_corr + erro_s)
+# intervalo
+
+theta_interval = function(df, i) { df %>% slice(i) %>% summarise(corr_news_med = cor(news_prop, mediana_pop)) %>% pull(corr_news_med) } 
+
+booted2 <- boot(data = lastfm, statistic = theta_interval, R = 2500)
+interval_boot_2 <- boot.ci(booted2, conf=.95, type="bca")
+# interval_boot_2$bca[4]
+# interval_boot_2$bca[5]
+
+ggplot() +
+  geom_rect(data = intervalo_2, aes(xmin = interval_boot_2$bca[4], xmax = interval_boot_2$bca[5]), ymin = -Inf, ymax = Inf, fill = "red", alpha = .25) +
+  geom_rect(data = intervalo_2, aes(xmin = valor_i_2, xmax = valor_s_2), ymin = -Inf, ymax = Inf, fill = "green", alpha = .25) +
+  geom_histogram(data = reamostragens_2, aes(theta_c_s_2), binwidth = .002, fill = "white", colour = "darkgrey") +
+  geom_vline(xintercept = theta_new_corr, color = "blue", size = .5) +
+  labs(title = expression("Intervalos estimados via: bootstrap manual (verde) +  boot lib (vermelho)"))
+
+```
+
+### Avaliação dos resultados:
+
+Para a segunda pergunta, conseguimos verificar que o intervalo de confiança calculado manualmente **[-0.161;0.065]**(verde) é novamente bem próximo do calculado usando a biblioteca boot **[-0.202;0.069]**(vermelho). Neste experimento podemos perceber que a correlação é negativa e fraca, ou seja, a proporção de pessoas que escutam músicas novas não está relacionado a escutar pop. A linha azul mostra o valor da média das correlações **-0.0889**.

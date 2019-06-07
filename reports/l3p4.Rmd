@@ -1,0 +1,181 @@
+---
+title: "Inferência sobre os jogos do campeonato brasileiro de 2017"
+author: "Helder Machado - Hector Medeiros"
+output:
+  html_notebook:
+    fig_width: 7
+    theme: readable
+    toc: yes
+    toc_float: yes
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: yes
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(boot)
+library(broom)
+options(scipen = 999)
+set.seed(12345)
+knitr::opts_chunk$set(echo = TRUE)
+theme_set(theme_bw())
+```
+
+```{r include=FALSE, message=FALSE,warning=FALSE}
+dados_futebol <- readr::read_csv2(here::here("data/futebol.csv"))
+```
+
+## 1. Jogos aos domingos têm mais gols que jogos às quartas?
+
+```{r}
+computa_gols_dia = function(df,day) { df %>% filter(Dia == day) %>% summarise(gols_mean_day = mean(gols)) %>% pull(gols_mean_day) }
+
+computa_domingo = computa_gols_dia(dados_futebol,"Domingo")
+
+computa_quarta = computa_gols_dia(dados_futebol,"Quarta-feira")
+theta_populacao = computa_domingo - computa_quarta
+```
+
+
+```{r}
+theta_embaralhado = function(){
+    dia_gols = dados_futebol %>% 
+        mutate(futebol_embaralhado = sample(Dia, n())) %>% 
+        group_by(futebol_embaralhado) %>% 
+        summarise(gols_dia = mean(gols)) 
+    
+    domingo = dia_gols %>% filter(futebol_embaralhado == "Domingo") %>% pull(gols_dia)
+    quarta = dia_gols %>% filter(futebol_embaralhado == "Quarta-feira") %>% pull(gols_dia)
+    
+    domingo - quarta
+}
+theta_calculado = theta_embaralhado()
+```
+
+
+
+```{r}
+diffs1 = replicate(5000, {theta_embaralhado()})
+tibble(diferenca = diffs1) %>% 
+  ggplot(aes(x = diferenca)) + 
+    geom_density(fill = "white", color = "darkgreen") + 
+  geom_vline(xintercept = theta_calculado, 
+             color = "orange") + 
+    geom_vline(xintercept = - theta_calculado, 
+             color = "orange") + 
+    geom_rug()
+```
+## P-Valor
+
+```{r}
+mean(abs(diffs1) >= abs(theta_populacao))
+```
+
+## Intervalo de confiança
+
+```{r}
+theta_diferenca = function(d, i){
+    golos = d %>% 
+        slice(i) %>% 
+        group_by(Dia) %>% 
+        summarise(gols_dia = mean(gols)) 
+    
+    domingo = golos %>% filter(Dia == "Domingo") %>% pull(gols_dia)
+    quarta = golos %>% filter(Dia == "Quarta-feira") %>% pull(gols_dia)
+    
+    domingo - quarta
+}
+theta_c_fds = theta_diferenca(dados_futebol, 1:NROW(dados_futebol))
+```
+
+```{r}
+dados_futebol %>% 
+    boot(statistic = theta_diferenca, R = 4000) %>% 
+    tidy(conf.level = 0.95, 
+         conf.int = TRUE)
+```
+## Avaliação dos resultados:
+
+Para a primeira pergunta, conseguimos verificar a média de gols do **domingo** não supera média da **quarta-feira** e que simulando os valores o valor encontrado está sempre dentro do intervalo de confiança acima para a média de todas as 5000 simulações. Já se observamos o P-Valor, vamos verificar que **94.88%** da vezes a hipótese nula vai se estar de acordo com o valor esperado, ou seja, podemos aceitar a hipótese nula mas não necessáriamente ela é melhor do que os valores da população. Para este caso tanto a abordagem de intervalo de confiança como de p-valor representam bem os valores esperados.
+
+
+## 2. Jogos onde há um vitorioso têm mais ou menos gols que empates? 
+
+```{r}
+computa_gols_empate = function(df) { df %>%   mutate(empate = Vencedor == "-") %>% 
+  group_by(empate) %>%filter(empate == TRUE) %>% summarise(gols_mean_day = mean(gols)) %>% pull(gols_mean_day) }
+computa_gols_vencedor = function(df) { df %>%   mutate(empate = Vencedor == "-") %>% 
+  group_by(empate) %>% filter(empate != TRUE) %>% summarise(gols_mean_day = mean(gols)) %>% pull(gols_mean_day) }
+
+computa_empate = computa_gols_empate(dados_futebol)
+
+computa_vencedor = computa_gols_vencedor(dados_futebol)
+theta_populacao_empate_vencedor = computa_empate - computa_vencedor
+```
+
+
+```{r}
+theta_embaralhado2 = function(){
+    dia_jogo = dados_futebol %>% 
+        mutate(empate = Vencedor == "-") %>% 
+        mutate(vencedor_embaralhado = sample(empate, n())) %>% 
+        group_by(vencedor_embaralhado) %>% 
+        summarise(gols_dias = mean(gols)) 
+    
+    empate = dia_jogo %>% filter(vencedor_embaralhado == TRUE) %>% pull(gols_dias)
+    vencedor = dia_jogo %>% filter(vencedor_embaralhado != TRUE) %>% pull(gols_dias)
+    
+    empate - vencedor
+}
+theta_calculado_empate_vitoria = theta_embaralhado2()
+```
+
+
+
+```{r}
+diffs2 = replicate(5000, {theta_embaralhado2()})
+tibble(diferenca = diffs2) %>% 
+  ggplot(aes(x = diferenca)) + 
+    geom_density(fill = "white", color = "darkgreen") + 
+  geom_vline(xintercept = theta_calculado_empate_vitoria, 
+             color = "orange") + 
+    geom_vline(xintercept = - theta_calculado_empate_vitoria, 
+             color = "orange") + 
+    geom_rug()
+```
+## P-Valor
+
+```{r}
+mean(abs(diffs2) >= abs(theta_populacao_empate_vencedor))
+```
+
+## Intervalo de Confiança
+
+```{r}
+theta_diferenca2 = function(d, i){
+    golos = d %>% 
+        mutate(empate = Vencedor == "-") %>% 
+        group_by(empate) %>% 
+        slice(i) %>% 
+        summarise(gols_dia = mean(gols)) 
+    
+    empate = golos %>% filter(empate == TRUE) %>% pull(gols_dia)
+    vencedor = golos %>% filter(empate != TRUE) %>% pull(gols_dia)
+    
+    empate - vencedor
+}
+theta_c_partida = theta_diferenca2(dados_futebol, 1:NROW(dados_futebol))
+```
+
+```{r}
+dados_futebol %>% 
+    boot(statistic = theta_diferenca2, R = 4000) %>% 
+    tidy(conf.level = 0.95, 
+         conf.int = TRUE)
+```
+
+## Avaliação dos resultados:
+
+Para a segunda pergunta, foi possível observar que quando há um vencedor há também um número maior de gols, e que simulando os valores o valor médio encontrado está sempre dentro do intervalo de confiança acima para a média de todas as 5000 simulações. Já se observamos o P-Valor, vamos verificar que **0.22%** da vezes a hipótese nula vai se estar de acordo com o valor esperado, ou seja, hipótese nula não reflete o valor esperado dos dados de forma satisfatória, neste caso o intervalo de confiança representa uma melhor abordagem.
