@@ -23,14 +23,55 @@ knitr::opts_chunk$set(echo = TRUE)
 theme_set(theme_bw())
 ```
 
+##Conhecendo o dataset
+
+Nosso objetivo é predizer os valores de carros utilizando um dataset com várias informações. Um resumo desse conjunto de dados é:
 ```{r}
 dados_carros = read.csv2(here::here("data/true_car_listings.csv"),sep=",", header=T)
+dados_carros
+```
+Iremos filtrar o dataset para retirar linhas nulas e/ou duplicadas, também excluiremos as colunas **City, State, Vin e Make**
+
+```{r}
 dados_carros = dados_carros[,!(names(dados_carros) %in% c("State","City","Vin","Make"))]
 novos_carros = dados_carros %>% drop_na()
 # novos_carros
 novos_carros = novos_carros%>% distinct()
 novos_carros
 ```
+
+Utilizando o **botar aqui pra alterar depois numa explicação boa** Python da balada pra montar os dataset clean
+```{r}
+acura_clean = read.csv2(here::here("data/acura_clean.csv"),sep=",", header=T)
+toyota_clean = read.csv2(here::here("data/toyota_clean.csv"),sep=",", header=T)
+volto_clean = read.csv2(here::here("data/volvo_clean.csv"),sep=",", header=T)
+vw_clean = read.csv2(here::here("data/vw_clean.csv"),sep=",", header=T)
+
+```
+
+##Normalização dos dados
+
+```{r}
+acura_clean %>%
+   mutate(idade = 2018 - Year, 
+          milhagem = (Mileage* 1.60934 ) /1000 )
+
+# Compute the analysis of variance
+res.aov <- aov(Price ~ Year, data = acura_clean)
+# Summary of the analysis
+summary(res.aov)
+
+fit200 <- lm(Price ~ Year, data=acura_clean)
+
+
+tidy(fit200, conf.int = TRUE)
+glance(fit200)
+
+  
+  
+```
+
+
 
 ```{r}
 fit2006 <- lm(Price ~ Year, data=dados_carros)

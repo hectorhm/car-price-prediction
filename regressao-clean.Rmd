@@ -1,0 +1,114 @@
+---
+title: "Regressao"
+author: "Helder Machado - Hector Medeiros - Wesley Anibal"
+output:
+  html_notebook:
+    fig_width: 7
+    theme: readable
+    toc: yes
+    toc_float: yes
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: yes
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(boot)
+library(broom)
+options(scipen = 999, OutDec=".")
+set.seed(12345)
+knitr::opts_chunk$set(echo = TRUE)
+theme_set(theme_bw())
+```
+
+##Conhecendo o dataset
+
+
+Utilizando o **botar aqui pra alterar depois numa explicação boa** Python da balada pra montar os dataset clean
+```{r}
+acura_clean = read.csv2(here::here("data/acura_clean.csv"),sep=",", header=T)
+toyota_clean = read.csv2(here::here("data/toyota_clean.csv"),sep=",", header=T)
+volto_clean = read.csv2(here::here("data/volvo_clean.csv"),sep=",", header=T)
+vw_clean = read.csv2(here::here("data/vw_clean.csv"),sep=",", header=T)
+
+```
+
+
+Os valores dos preços dos carros estão distribuidos da seguinte maneira
+```{r}
+acura_clean %>%
+    ggplot(aes(x=Price))+
+    geom_histogram()
+```
+
+Avaliaremos se o valor do carro sofre alguma alteração com o seu tempo de idade e com a sua quilometragem rodada.
+
+##Montando modelo
+
+
+
+```{r}
+acura_clean %>%
+   mutate(idade = 2018 - Year, 
+          milhagem = (Mileage* 1.60934 ) /1000 )
+  
+```
+
+Utilizando a tabela ANOVA podemos perceber que existe regressão
+
+```{r}
+# Compute the analysis of variance
+res.aov <- aov(Price ~ Year, data = acura_clean)
+# Summary of the analysis
+summary(res.aov)
+```
+
+
+
+```{r}
+fit200 <- lm(Price ~ ., data=acura_clean)
+
+tidy(fit200, conf.int = TRUE)
+glance(fit200)
+
+```
+
+## R^2 é a variância da variável de saída explicada pelo modelo
+
+```{r}
+# variância de y
+var.y2 <- sum((acura_clean$Price - mean(acura_clean$Price))^2)
+# variância dos resíduos do modelo
+var.residuals <- sum(fit200$residuals^2)
+
+#calculando e conferindo o R^2
+(var.y2 - var.residuals)/var.y2
+rsquare(fit200, data = acura_clean)
+
+glance(mod)
+```
+
+
+Percebemos que o valor do resultado de R² é 0.9657332, indica que o modelo de regressão explica fortemente os dados coletados, ou seja, há erros no modelo mas não é o sufieciente para descartá-lo.
+
+Calculando o erro quadrático médio
+
+```{r}
+rmse(fit200 , acura_clean)
+mae(fit200, acura_clean)
+qae(fit200, acura_clean)
+```
+
+
+```{r}
+
+acura_clean %>% 
+  add_predictions(model = fit200) %>% # add o que o modelo estima p cada  _grad
+  ggplot(mapping = aes(x = Price, y = Year)) + 
+  geom_point(alpha = 0.4, size = .1) + 
+  geom_line(aes(y = pred), colour = "red")  + 
+  geom_abline(intercept = 75, slope = -.72, color  = "darkblue") 
+```
+
