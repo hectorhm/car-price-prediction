@@ -1,0 +1,140 @@
+---
+title: "Regressao"
+author: "Helder Machado - Hector Medeiros - Wesley Anibal"
+output:
+  html_notebook:
+    fig_width: 7
+    theme: readable
+    toc: yes
+    toc_float: yes
+  html_document:
+    theme: readable
+    df_print: paged
+    toc: yes
+---
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(boot)
+library(broom)
+require(ISLR)
+library(GGally)
+library(ggfortify)
+library(modelr)
+options(scipen = 999, OutDec=".")
+set.seed(12345)
+knitr::opts_chunk$set(echo = TRUE)
+theme_set(theme_bw())
+```
+
+## Os dados
+-descrever os dados
+
+```{r message=FALSE, warning=FALSE}
+dados_carros = read.csv2(here::here("data/true_car_listings.csv"),sep=",", header=T)
+dados_carros
+```
+
+## Tratamento dos dados
+-descrever processo
+
+```{r}
+ajusta_dados <- function(dados){
+  dados = dados[,!(names(dados) %in% c("State","City","Vin","Make","Model"))]
+  return (dados %>% drop_na() %>% distinct() %>% filter(Price < 100000) %>% mutate( idade = 2018 - Year, 
+                   milhagem = (Mileage* 1.60934 ) /1000 ) )
+}
+
+dados_carros_sem_filtro = dados_carros[,!(names(dados_carros) %in% c("State","City","Vin","Make","Model"))]
+
+dados_carros = ajusta_dados(dados_carros)
+```
+
+## Correlação das variáveis
+-descrever os dados
+
+```{r  message=FALSE, warning=FALSE}
+dados_carros %>% select( -Year, -Mileage, -residuo,-pred_mod_vw) %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
+dados_carros_sem_filtro %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
+```
+
+## Criando o modelo
+-descrever os dados
+
+```{r}
+modelo_geral <- lm(Price ~ idade + milhagem, data = dados_carros)
+modelo_linear <- lm(Price ~ idade, data = dados_carros)
+```
+
+### Resumo do modelo
+-descrever os dados
+
+```{r}
+dados_carros$pred_mod_vw <- predict(modelo_geral, newdata = dados_carros)
+dados_carros <- dados_carros %>% mutate(residuo = dados_carros$Price - dados_carros$pred_mod_vw )
+plot( resid( modelo_geral ) ~ fitted( modelo_geral ) )
+
+tidy(modelo_geral)
+```
+
+### Criando os intervalos de confiança, erro 
+-descrever os dados
+
+**95%** de confiança
+
+```{r}
+intervalo_conf = dados_carros %>% 
+  mutate(erro = abs(dados_carros$Price - dados_carros$pred_mod_vw)) %>% 
+  summarise(erro_i = quantile(erro, .01), 
+            erro_s = quantile(erro, .95)) %>% 
+  mutate(valor_i = mean(dados_carros$Price) + erro_i, 
+         valor_s = mean(dados_carros$Price) + erro_s)
+intervalo_conf
+```
+
+**99%** de confiança
+
+```{r}
+intervalo_conf_99 = dados_carros %>% 
+  mutate(erro = abs(dados_carros$Price - dados_carros$pred_mod_vw)) %>% 
+  summarise(erro_i = quantile(erro, .01), 
+            erro_s = quantile(erro, .99)) %>% 
+  mutate(valor_i = mean(dados_carros$Price) + erro_i, 
+         valor_s = mean(dados_carros$Price) + erro_s)
+intervalo_conf_99
+```
+
+### Gráfico Intervalo de confiança
+
+```{r}
+ggplot() +
+  geom_rect(
+    data = intervalo_conf_99,
+    aes(xmin = valor_i, xmax = valor_s),
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "brown",
+    alpha = .25
+  ) +
+  geom_rect(
+    data = intervalo_conf,
+    aes(xmin = valor_i, xmax = valor_s),
+    ymin = -Inf,
+    ymax = Inf,
+    fill = "gold",
+    alpha = .25
+  ) +
+  geom_histogram(
+    data = dados_carros,
+    aes(dados_carros$Price),
+    binwidth = .5,
+    fill = "white",
+    colour = "darkgrey"
+  ) +
+  geom_vline(xintercept = mean(dados_carros$Price),
+             color = "blue",
+             size = 1.2) +
+  geom_vline(xintercept = mean(dados_carros$pred_mod_vw), color = "dark green") +
+  labs(title = expression("Intervalo de Confiança - 95% Amarelo, 99% Rosa",x = "Preço dos carros em $",
+       y = "Número de carros com o preço"))
+```
