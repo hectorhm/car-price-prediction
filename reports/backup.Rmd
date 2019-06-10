@@ -28,7 +28,8 @@ theme_set(theme_bw())
 ```
 
 ## Os dados
--descrever os dados
+  - Nossa base de dados consiste em dados sobre carros em alguns continentes (europa, americas) em que diversos aspectos do carro foram selecionados. Os principais elementos são: Preço, Kilometragem e ano.  
+    Colunas: Price, Year, Mileage, City, State, Vin, Make, Model
 
 ```{r message=FALSE, warning=FALSE}
 dados_carros = read.csv2(here::here("data/true_car_listings.csv"),sep=",", header=T)
@@ -36,7 +37,7 @@ dados_carros
 ```
 
 ## Tratamento dos dados
--descrever processo
+-Nesta parte achamos necessário remover algumas colunas e fazer alguma manipulação dos dados para poder melhorar a visualização. Ocultamos as colunas: Estado, Modelo, Vin, Marca e cidade. Além disto, convertemos a kilometram de milhas para km , dividimos por 1000 e criamos uma coluna idade que é representada por 2018(último ano completo) - Year(ano do carro). Assim os dados apresentaram uma melhor construção do modelo.
 
 ```{r}
 ajusta_dados <- function(dados){
@@ -51,15 +52,17 @@ dados_carros = ajusta_dados(dados_carros)
 ```
 
 ## Correlação das variáveis
--descrever os dados
+-Aqui mostramos as correlações entre as 3 variáveis selecionadas para a montagem do modelo de regressão, que são elas: idade, preço e milhagem.
+Como podemos perceber, existe sempre uma correlação entre as 3, positiva ou negativa. O que faz todo sentido, quanto maior a idade, menor o preço, quanto mais milhas ele percorre, menor o preço.E também que quanto maior a milhagem maior a idade do carro, tudo conforme esperado.
+
 
 ```{r  message=FALSE, warning=FALSE}
-dados_carros %>% select( -Year, -Mileage, -residuo,-pred_mod_vw) %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
+dados_carros %>% select( -Year, -Mileage) %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
 dados_carros_sem_filtro %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
 ```
 
 ## Criando o modelo
--descrever os dados
+-Criamos um modelo de Preço em relação a idade + milhagem para verificar se é possível prever o preço dos carros com apenas estas duas variáveis.
 
 ```{r}
 modelo_geral <- lm(Price ~ idade + milhagem, data = dados_carros)
@@ -67,18 +70,23 @@ modelo_linear <- lm(Price ~ idade, data = dados_carros)
 ```
 
 ### Resumo do modelo
--descrever os dados
+-Depois de montado o modelo é hora da avaliação, verificando os resíduos é possível perceber uma tendência de aproximação a 0, ou seja, a diferença do valor esperado com o valor encontrado parece tender a 0, o que para o nosso modelo é bom, ele realmente parece prever o valor dos carros de forma correta em boa parte das vezes.
 
 ```{r}
 dados_carros$pred_mod_vw <- predict(modelo_geral, newdata = dados_carros)
 dados_carros <- dados_carros %>% mutate(residuo = dados_carros$Price - dados_carros$pred_mod_vw )
 plot( resid( modelo_geral ) ~ fitted( modelo_geral ) )
 
+# Compute the analysis of variance
+res.aov <- aov(Price ~ Year, data = dados_carros)
+# Summary of the analysis
+summary(res.aov)
+
 tidy(modelo_geral)
 ```
 
 ### Criando os intervalos de confiança, erro 
--descrever os dados
+-Aqui montamos intervalos de confiança para um melhor entendimento do modelo, com 95% dew confiança e para 99% de confiança.
 
 **95%** de confiança
 
@@ -138,3 +146,32 @@ ggplot() +
   labs(title = expression("Intervalo de Confiança - 95% Amarelo, 99% Rosa",x = "Preço dos carros em $",
        y = "Número de carros com o preço"))
 ```
+
+##Analisando por meio de estatítiscas
+
+Uma maneira de mostrar que o modelo adotado realmente condiz com a realidade é analisando os erros residuais que a mesma tem. Uma forma estatística bastante difundida para mostrar a integridade do dado é a análise do **R²** que é o coeficiente de determinação que segundo a Wikipedia é " é uma medida de ajustamento de um modelo estatístico linear generalizado, como a regressão linear, em relação aos valores observados". O valor de **R²** varia entre 0 e 1. Sendo que mais próximo de 1, mais existem evidências do modelo conseguir explicar os valores observados. Nosso **R²** pode ser visto na tabela abaixo:
+```{r}
+# variância de y
+var.y2 <- sum((dados_carros$Price - mean(dados_carros$Price))^2)
+# variância dos resíduos do modelo
+var.residuals <- sum(modelo_geral$residuals^2)
+
+#calculando e conferindo o R^2
+(var.y2 - var.residuals)/var.y2
+rsquare(modelo_geral, data = dados_carros)
+
+
+glance(modelo_geral)
+```
+
+Nosso **R²** é 0.2473829. O que indica que esse modelo não possui bons sinais que explicam a regressão,
+Outras medidas que podem ser utilizadas para a análise são o:
+- MAE: Erro médio absolutos
+- RMSE: Raiz do erro quadrático médio
+
+```{r}
+mae(modelo_geral, dados_carros)
+rmse(modelo_geral, dados_carros)
+
+```
+
