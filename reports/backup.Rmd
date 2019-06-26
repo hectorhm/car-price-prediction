@@ -8,8 +8,10 @@ output:
     toc: yes
     toc_float: yes
   html_document:
-    theme: readable
     df_print: paged
+    theme: readable
+    toc: yes
+  pdf_document:
     toc: yes
 ---
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
@@ -33,6 +35,7 @@ theme_set(theme_bw())
 
 ```{r message=FALSE, warning=FALSE}
 dados_carros = read.csv2(here::here("data/true_car_listings.csv"),sep=",", header=T)
+dados_carros_vw = read.csv2(here::here("data/vw.csv"),sep=",", header=T)
 dados_carros
 ```
 
@@ -49,6 +52,7 @@ ajusta_dados <- function(dados){
 dados_carros_sem_filtro = dados_carros[,!(names(dados_carros) %in% c("State","City","Vin","Make","Model"))]
 
 dados_carros = ajusta_dados(dados_carros)
+dados_carros_vw = ajusta_dados(dados_carros_vw)
 ```
 
 ## Correlação das variáveis
@@ -58,7 +62,7 @@ Como podemos perceber, existe sempre uma correlação entre as 3, positiva ou ne
 
 ```{r  message=FALSE, warning=FALSE}
 dados_carros %>% select( -Year, -Mileage) %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
-dados_carros_sem_filtro %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
+# dados_carros_sem_filtro %>% ggpairs(lower = list(continuous = wrap("points", alpha = 0.3)))
 ```
 
 ## Criando o modelo
@@ -67,6 +71,7 @@ dados_carros_sem_filtro %>% ggpairs(lower = list(continuous = wrap("points", alp
 ```{r}
 modelo_geral <- lm(Price ~ idade + milhagem, data = dados_carros)
 modelo_linear <- lm(Price ~ idade, data = dados_carros)
+modelo_vw <- lm(Price ~ idade + milhagem, data = dados_carros_vw)
 ```
 
 ### Resumo do modelo
@@ -78,11 +83,11 @@ dados_carros <- dados_carros %>% mutate(residuo = dados_carros$Price - dados_car
 plot( resid( modelo_geral ) ~ fitted( modelo_geral ) )
 
 # Compute the analysis of variance
-res.aov <- aov(Price ~ Year, data = dados_carros)
+res.aov <- aov(Price ~ idade + milhagem, data = dados_carros)
 # Summary of the analysis
 summary(res.aov)
 
-tidy(modelo_geral)
+tidy(modelo_geral, conf.int = TRUE)
 ```
 
 ### Criando os intervalos de confiança, erro 
@@ -142,14 +147,15 @@ ggplot() +
   geom_vline(xintercept = mean(dados_carros$Price),
              color = "blue",
              size = 1.2) +
-  geom_vline(xintercept = mean(dados_carros$pred_mod_vw), color = "dark green") +
+  geom_vline(xintercept = mean(dados_carros$Price), color = "dark green") +
   labs(title = expression("Intervalo de Confiança - 95% Amarelo, 99% Rosa",x = "Preço dos carros em $",
        y = "Número de carros com o preço"))
 ```
 
-##Analisando por meio de estatítiscas
+## Analisando por meio de estatítiscas
 
 Uma maneira de mostrar que o modelo adotado realmente condiz com a realidade é analisando os erros residuais que a mesma tem. Uma forma estatística bastante difundida para mostrar a integridade do dado é a análise do **R²** que é o coeficiente de determinação que segundo a Wikipedia é " é uma medida de ajustamento de um modelo estatístico linear generalizado, como a regressão linear, em relação aos valores observados". O valor de **R²** varia entre 0 e 1. Sendo que mais próximo de 1, mais existem evidências do modelo conseguir explicar os valores observados. Nosso **R²** pode ser visto na tabela abaixo:
+
 ```{r}
 # variância de y
 var.y2 <- sum((dados_carros$Price - mean(dados_carros$Price))^2)
@@ -172,6 +178,42 @@ Outras medidas que podem ser utilizadas para a análise são o:
 ```{r}
 mae(modelo_geral, dados_carros)
 rmse(modelo_geral, dados_carros)
+
+```
+## Amostra VW
+
+```{r}
+
+tidy(modelo_vw)
+ggplot(modelo_vw, aes(x = predict(modelo_vw), y = residuals(modelo_vw))) + geom_point() + geom_smooth(method = "lm")
+
+```
+
+```{r}
+# variância de y
+var.y2 <- sum((dados_carros_vw$Price - mean(dados_carros_vw$Price))^2)
+# variância dos resíduos do modelo
+var.residuals <- sum(modelo_vw$residuals^2)
+
+#calculando e conferindo o R^2
+(var.y2 - var.residuals)/var.y2
+rsquare(modelo_vw, data = dados_carros_vw)
+
+glance(modelo_vw)
+```
+
+```{r}
+mae(modelo_geral, dados_carros)
+rmse(modelo_geral, dados_carros)
+
+```
+
+#### Regressão linear extra
+
+```{r}
+x = lm(cars$dist ~ cars$speed)
+plot(cars)
+abline(x$coefficients, col="red")
 
 ```
 
