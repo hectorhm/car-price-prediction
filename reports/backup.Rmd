@@ -74,6 +74,14 @@ modelo_linear <- lm(Price ~ idade, data = dados_carros)
 modelo_vw <- lm(Price ~ idade + milhagem, data = dados_carros_vw)
 ```
 
+##Visualizando tabela ANOVA
+```{r}
+anova(modelo_geral)
+```
+
+Assim como a tabela Anova gerada mostra, obtivemos o valor F = 243817 e o p-valor = 0,0022 em relação a idade e valor F = 35125 e o p-valor = 0,0022 em relação a Milhagem, só olhando vemos que o p-valor se torna muito baixo, mostrando que a pouca variação entre o valor original do carro e o valor que foi gerado pela regressão, de forma com que nos aproximamos do valor original, e que o algoritmo para prever o preço dos carros teve sucesso. Levando-se em conta o Valor F, e os resíduos, e com 3 GL, pelo fato das 3 variáveis, obtivemos o valor na tabela F de 10.128 , ele estando dentro da área de aceitação, chegando também a conclusão de que a quilometragem e a idade afetam o preço dos carros, tanto usando o p-valor quando o valor F.
+
+
 ### Resumo do modelo
 -Depois de montado o modelo é hora da avaliação, verificando os resíduos é possível perceber uma tendência de aproximação a 0, ou seja, a diferença do valor esperado com o valor encontrado parece tender a 0, o que para o nosso modelo é bom, ele realmente parece prever o valor dos carros de forma correta em boa parte das vezes.
 
