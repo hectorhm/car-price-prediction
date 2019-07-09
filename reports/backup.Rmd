@@ -2,17 +2,17 @@
 title: "Regressao"
 author: "Helder Machado - Hector Medeiros - Wesley Anibal"
 output:
-  html_notebook:
-    fig_width: 7
-    theme: readable
-    toc: yes
-    toc_float: yes
   html_document:
     df_print: paged
     theme: readable
     toc: yes
   pdf_document:
     toc: yes
+  html_notebook:
+    fig_width: 7
+    theme: readable
+    toc: yes
+    toc_float: yes
 ---
 ```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 library(tidyverse)
@@ -76,7 +76,8 @@ modelo_vw <- lm(Price ~ idade + milhagem, data = dados_carros_vw)
 
 ##Visualizando tabela ANOVA
 ```{r}
-anova(modelo_geral)
+anova = anova(modelo_geral)
+summary(anova)
 ```
 
 Assim como a tabela Anova gerada mostra, obtivemos o valor F = 243817 e o p-valor = 0,0022 em relação a idade e valor F = 35125 e o p-valor = 0,0022 em relação a Milhagem, só olhando vemos que o p-valor se torna muito baixo, mostrando que a pouca variação entre o valor original do carro e o valor que foi gerado pela regressão, de forma com que nos aproximamos do valor original, e que o algoritmo para prever o preço dos carros teve sucesso. Levando-se em conta o Valor F, e os resíduos, e com 3 GL, pelo fato das 3 variáveis, obtivemos o valor na tabela F de 10.128 , ele estando dentro da área de aceitação, chegando também a conclusão de que a quilometragem e a idade afetam o preço dos carros, tanto usando o p-valor quando o valor F.
@@ -93,7 +94,7 @@ plot( resid( modelo_geral ) ~ fitted( modelo_geral ) )
 # Compute the analysis of variance
 res.aov <- aov(Price ~ idade + milhagem, data = dados_carros)
 # Summary of the analysis
-summary(res.aov)
+#summary(res.aov)
 
 tidy(modelo_geral, conf.int = TRUE)
 ```
@@ -216,12 +217,12 @@ rmse(modelo_geral, dados_carros)
 
 ```
 
-#### Regressão linear extra
+### Avaliação Amostra Volkswagen
 
-```{r}
-x = lm(cars$dist ~ cars$speed)
-plot(cars)
-abline(x$coefficients, col="red")
+  Regressão linear múltipla foi utilizada para analisar a associação entre **idade, milhagem** e **Price** na amostra do carros da **Volkswagen**. Para a amostra foram feitas as mesmas melhorias para a visualização do estimador. Os resultados da regressão indicam que um modelo no formato **Price = -713,52 * idade - 36,92 * milhagem + 20704,72** explicam **45%** da variância da variável de resposta (R2 = 0.4506915 ). Como esperado, as variáveis tem efeito negativo no preço do carro, é possível perceber que a cada 1000 km o valor do carro diminui em 36, mas passado 1 ano este valor diminui em 713. O modelo representa quase **45%** dos dados, isso já é bem interessante e esperado, já que, para medir o preço do carro de forma precisa outros **n** fatores são necessários, tais como: marca, modelo, estado de conservação, dentre outros. Na amostra o efeito foi ainda mais próximo do que se espera, ou seja, alguns valores dentro da população podem ter efeitos que alterem drásticamente a previsão do modelo.
+  
 
-```
+### Avaliação Geral
+
+  Regressão linear múltipla foi utilizada para analisar a associação entre **idade, milhagem** e **Price** em alguns carros. Como a base de dados dos carros é da europa e da américa central a kilometragem estava em milhas, por isso resolvemos convertar pra KM e dividir por 1000 para melhorar a visualização do estimador. Para o ano do carro, resolvemos transformar em idade, também para melhorar a visualização do estimador. Os resultados da regressão indicam que um modelo no formato **Price = -864,3 * idade - 47 * milhagem + 29222,86** explicam **24,74%** da variância da variável de resposta (R2 = 0.2473 ). Como esperado, as variáveis tem efeito negativo no preço do carro, é possível perceber que a cada 1000 km o valor do carro diminui em 46, mas passado 1 ano este valor diminui em 864. O modelo representa apenas **24,74%** dos dados, isso já era esperado, já que, para medir o preço do carro de forma precisa outros **n** fatores são necessários, tais como: marca, modelo, estado de conservação, dentre outros.
 
